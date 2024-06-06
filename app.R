@@ -7,7 +7,7 @@ library(readxl)
 library(DT)
 library(glue)
 
-# data <- readRDS("app.rds")
+data <- readRDS("app.rds")
 
 hawks_players <- data |> 
   filter(Team == "Hyannis Harbor Hawks")
