@@ -6,18 +6,16 @@ library(tidyverse)
 library(GeomMLBStadiums)
 library(readxl)
 library(data.table)
+library(arrow)
 
 setwd("/Users/aidanbeilke/Downloads/")
 
 teams <- read_xlsx("FILE_6054.xlsx")
-data <- read.csv("Cape_Database_Fixed_Names_Final.csv") # cape data
-data2 <- read.csv("College_Updated_5_24TH 2.csv", nrows = 200000) # 2023 college data
+data <- read.csv("TM_2024_reg_szn (1).csv") # 2024 college data
 
 
 
 # Spray Chart
-
-data <- rbind(data3, data2)
 
 data <- data |> 
   mutate(Bearing = Bearing * pi / 180,
@@ -120,10 +118,10 @@ data <- data |>
          la = round(Angle)) |> 
   left_join(xba, by = c("ev", "la"))
 
-
-# write.csv(data, "app.csv")
+short <- data |> 
+  select(Date, Team, Batter, TaggedPitchType, PlateLocSide, PlateLocHeight, PitchCall, AutoHitType, PlayResult, xba,
+         ExitSpeed, Angle, Inning, Balls, Strikes, Outs, hc_x, hc_y, is_whiff, Zone, Distance, barrel)
 
 setwd("/Users/aidanbeilke/Desktop/Hawks Apps/Shiny App")
-saveRDS(data, "app.rds")
 
-
+saveRDS(short, "app.rds")
