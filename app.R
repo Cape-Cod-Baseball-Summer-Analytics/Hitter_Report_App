@@ -6,6 +6,8 @@ library(GeomMLBStadiums)
 library(readxl)
 library(DT)
 library(glue)
+library(hexbin)
+
 
 data <- readRDS("app.rds")
 
@@ -54,8 +56,8 @@ ui <- dashboardPage(
                        style = "padding-bottom: 20px;"),
                 column(3, offset = 1, dateRangeInput("date",
                                                      label = "Select a Game or Multiple",
-                                                     start = "2023-06-09",
-                                                     end = "2023-08-02",
+                                                     start = "2024-05-01",
+                                                     end = "2024-06-06",
                                                      min = "2022-01-01",
                                                      max = Sys.Date()),
                        style = "padding-bottom: 20px;"),
@@ -102,7 +104,7 @@ ui <- dashboardPage(
                        style = "padding-bottom: 20px;"),
                 column(3, selectInput("pitchType", "Select Pitch Type:",
                                                   choices = c("All" = "",
-                                                              "Four-Seam Fastball" = "FourSeamFastBall",
+                                                              "Fastball" = "Fastball",
                                                               "Sinker" = "Sinker",
                                                               "Cutter" = "Cutter",
                                                               "Slider" = "Slider",
@@ -156,6 +158,7 @@ ui <- dashboardPage(
 
 # Define server logic
 server <- function(input, output, session) {
+  
   home_plate_segments <- data.frame(
     x = c(0, 0.71, 0.71, 0, -0.71, -0.71),
     y = c(0.15, 0.15, 0.3, 0.5, 0.3, 0.15),
@@ -163,12 +166,15 @@ server <- function(input, output, session) {
     yend = c(0.15, 0.3, 0.5, 0.3, 0.15, 0.15)
   )
   
-  pitch_types <- c("Four-Seam Fastball", "Sinker", "Cutter", "Slider", "Curveball", "Changeup", "Splitter")
+  pitch_types <- c("Fastball", "Sinker", "Cutter", "Slider", "Curveball", "Changeup", "Splitter")
   
   observe({
-    valid_types <- intersect(c("FourSeamFastBall", "Sinker", "Cutter", "Slider", "Curveball", "ChangeUp", "Splitter"),
-                             unique(data[data$Batter == input$playerNameHeat,]$TaggedPitchType))
-    updateSelectInput(session, "pitchType", choices = c("All" = "", setNames(valid_types, valid_types)))
+    # Define all pitch types you want to include as options
+    all_pitch_types <- c("Fastball", "Sinker", "Cutter", "Slider", "Curveball", "ChangeUp", "Splitter")
+    
+    # Update the select input with these pitch types statically
+    updateSelectInput(session, "pitchType", 
+                      choices = c("All" = "", setNames(all_pitch_types, all_pitch_types)))
   })
   
   
@@ -399,7 +405,8 @@ server <- function(input, output, session) {
     num_pitches <- nrow(filtered_data)
     
     data |> 
-      filter(Batter == input$playerNameHeat, is_whiff == 1) |> 
+      filter(Batter == input$playerNameHeat, 
+             is_whiff == 1) |> 
       ggplot(aes(x = PlateLocSide, y = PlateLocHeight)) +
       stat_density_2d(geom = "polygon", aes(fill = after_stat(nlevel))) +
       xlim(c(2, -2)) +
@@ -513,7 +520,7 @@ server <- function(input, output, session) {
       stat_summary_hex(bins = 20) +
       scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = median(data$ExitSpeed, na.rm = TRUE)) +
       annotate('rect', xmin = -0.71, xmax = 0.71, ymin = 1.6, ymax = 3.5, fill = 'black', 
-               color = 'red', alpha = 0.0001, size = 1)+ theme(legend.position = "none") +
+               color = 'red', alpha = 0.0001, size = 1) + 
       coord_equal() + 
       xlim(c(-3, 3)) +
       ylim(c(0, 5)) +
@@ -532,16 +539,18 @@ server <- function(input, output, session) {
       mutate(hard_hit = ifelse(ExitSpeed >= 95, 1, 0),
              is_sweet_spot = ifelse(Angle >= 8 & Angle <= 32, 1, 0)) |> 
       group_by(Batter) |> 
-      summarise(BBE = n(),
-                `LA(°)` = round(mean(Angle, na.rm = T),1),
-                `LA SwSp%` = round(mean(is_sweet_spot, na.rm = T)*100, 1),
-                max_ev = round(max(ExitSpeed, na.rm = T), 1),
-                avg_ev = round(mean(ExitSpeed, na.rm = T), 1),
-                max_distance = round(max(Distance, na.rm = T)),
-                `95+` = sum(hard_hit, na.rm = T),
-                hard_hit_rate = round(mean(hard_hit, na.rm = T)*100, 1),
-                barrels = sum(barrel, na.rm = T),
-                barrels_per_bbe = round((barrels / BBE)*100, 1)) |> 
+      summarise(
+        BBE = n(),
+        `LA(°)` = round(mean(Angle, na.rm = TRUE), 1),
+        `LA SwSp%` = round(mean(is_sweet_spot, na.rm = TRUE) * 100, 1),
+        max_ev = ifelse(all(is.na(ExitSpeed)), NA, round(max(ExitSpeed, na.rm = TRUE), 1)),
+        avg_ev = round(mean(ExitSpeed, na.rm = TRUE), 1),
+        max_distance = round(max(Distance, na.rm = TRUE)),
+        `95+` = sum(hard_hit, na.rm = TRUE),
+        hard_hit_rate = round(mean(hard_hit, na.rm = TRUE) * 100, 1),
+        barrels = sum(barrel, na.rm = TRUE),
+        barrels_per_bbe = round((barrels / BBE) * 100, 1)
+      ) |> 
       filter(BBE >= 15) |> 
       arrange(desc(barrels_per_bbe))
     
